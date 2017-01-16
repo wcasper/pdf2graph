@@ -23,7 +23,9 @@ def get_eps_objects(content):
     b0 = blocks[ib-1]
     block = values[b0:b1]
 
-    if("imagemask" in block):
+    print(block)
+
+    if "setcolorspace" in block:
       image = EPSImage()
       blen = len(block)
 
