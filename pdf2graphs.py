@@ -42,10 +42,6 @@ if __name__ == '__main__':
   npages = int(str(result).split()[1].replace("\\n'",""))
   print("PDF has", npages, "pages")
 
-  # TODO, extract images by decoding (ascii85?) string after image tags and types
-  # TODO, pair recreations of graphs with extracted JSON in validation step
-  # TODO, simple graph check, removes graphs with no edges or low vertices (2 or less)
-
   # for each pdf page, remove text and convert to jpeg
   images = []
   for ip in range(1,npages+1):
@@ -57,11 +53,13 @@ if __name__ == '__main__':
     lines = ifile.readlines()
     ifile.close()
 
-    
-    lines = remove_text(lines);
-    lines = remove_resources(lines);
-    lines = remove_page_setup(lines);
-    lines = remove_remainder(lines);
+    header1, header2 = get_headers(lines)
+    footer = get_footer(lines)
+
+    lines = remove_text(lines)
+    lines = remove_resources(lines)
+    lines = remove_page_setup(lines)
+    lines = remove_remainder(lines)
 
     content = ' '.join(lines)
     eps_objects = get_eps_objects(content)
@@ -72,16 +70,46 @@ if __name__ == '__main__':
     print("Found %i graphs!" % (len(graphs)))
 
     images = list()
-    count = 1
     for obj in eps_objects:
       if isinstance(obj,EPSImage):
-        # decode
-        # output decoding as %i-%i.png % (ip, count)
         images.append(obj)
-        count += 1
-
 
     print("Found %i images!" % len(images))
+
+    # extract images
+    for i,image in enumerate(images):
+      ofile = open("%s-%d-%d.eps" % (pdfname[:-4],ip,i+1),'w+')
+      for line in header1:
+        ofile.write(line)
+
+      ofile.write("%%%%BoundingBox: 0 0 %s %s\n" % (image.setup.values[1],image.setup.values[2]))
+      for line in header2:
+        ofile.write(line)
+
+      # write image
+      ofile.write("%s setcolorspace\n" % image.setup.values[11])
+      ofile.write("8 dict dup begin\n")
+      ofile.write("  /ImageType %s def\n" % image.setup.values[0])
+      ofile.write("  /Width %s def\n" % image.setup.values[1])
+      ofile.write("  /Height %s def\n" % image.setup.values[2])
+      if image.setup.values[3]:
+        ofile.write("  /Interpolate %s def\n" % str(image.setup.values[3]).lower())
+
+      ofile.write("  /BitsPerComponent %s def\n" % image.setup.values[4])
+      ofile.write("  /Decode [ %s ] def\n" % ' '.join(image.setup.values[5]))
+      ofile.write("  /DataSource %s /ASCII85Decode %s %s %s def\n" % tuple(image.setup.values[6:10]))
+      ofile.write("  /ImageMatrix [ %s ] def\n" % ' '.join(image.setup.values[10]))
+      ofile.write("end\nimage\n")
+      ofile.write('\n '.join(image.encoded))
+      if image.encoded[-1][-2:] == '~>':
+        ofile.write('\nQ\n')
+      else:
+        ofile.write('\n')
+
+      for line in footer:
+        ofile.write(line)
+
+      ofile.close()
 
     # generate report page
     for g in graphs:

@@ -23,27 +23,24 @@ def get_eps_objects(content):
     b0 = blocks[ib-1]
     block = values[b0:b1]
 
-    print(block)
-
     if "setcolorspace" in block:
       image = EPSImage()
       blen = len(block)
 
       for i in range(blen):
         val = block[i]
-        if(val == "/ImageType"):
-          image.setup.values[0] = int(block[i+1])
+        if(val == "setcolorspace"):
+          image.setup.values[11] = block[i-1]
+        elif(val == "/ImageType"):
+          image.setup.values[0] = block[i+1]
         elif(val == "/Width"):
-          image.setup.values[1] = int(block[i+1])
+          image.setup.values[1] = block[i+1]
         elif(val == "/Height"):
-          image.setup.values[2] = int(block[i+1])
+          image.setup.values[2] = block[i+1]
         elif(val == "/Interpolate"):
-          if(block[i+1] == "false"):
-            image.setup.values[3] = False
-          else:
-            image.setup.values[3] = False
+          image.setup.values[3] = block[i+1] == "true"  
         elif(val == "/BitsPerComponent"):
-          image.setup.values[4] = int(block[i+1])
+          image.setup.values[4] = block[i+1]
         elif(val == "/Decode"):
           if(block[i+1] == "["):
             tmp = []
@@ -51,14 +48,15 @@ def get_eps_objects(content):
               if(block[j] == "]"):
                 break
               else:
-                tmp.append(int(block[j]))
+                tmp.append(block[j])
             image.setup.values[5] = tmp
         elif(val == "/DataSource"):
           image.setup.values[6] = block[i+1]
         elif(val == "/ASCII85Decode"):
           image.setup.values[7] = block[i+1]
-        elif(val == "/FlateDecode"):
-          image.setup.values[8] = block[i+1]
+        elif(val == "/FlateDecode" or val == "/DCTDecode"):
+          image.setup.values[8] = block[i]
+          image.setup.values[9] = block[i+1]
         elif(val == "/ImageMatrix"):
           if(block[i+1] == "["):
             tmp = []
@@ -66,12 +64,16 @@ def get_eps_objects(content):
               if(block[j] == "]"):
                 break
               else:
-                tmp.append(int(block[j]))
-            image.setup.values[9] = tmp
+                tmp.append(block[j])
+            image.setup.values[10] = tmp
 
         elif(val == "imagemask"):
           image.imagemask = block[i+1]
-
+        elif val == "image":
+          end = i + 1
+          while not ('~>Q' == block[end][-3:] or '~>' == block[end][-2:]):
+            end += 1
+          image.encoded = block[i+1:end+1]
 
       objects.append(image)
 
