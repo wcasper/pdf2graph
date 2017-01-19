@@ -1,0 +1,13 @@
+# ignore pdfs
+*.pdf
+
+# ignore generated files
+*.pyc
+*.eps
+*.txt
+
+# ignore images
+*.ppm
+*.jpg
+*.png
+*.pbm
