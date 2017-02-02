@@ -5,7 +5,6 @@ import subprocess
 from epstrim import *
 from epsinterpreter import *
 from graph_guess import *
-from image_decode import *
 
 ##
 # parse command line input
@@ -78,7 +77,8 @@ if __name__ == '__main__':
 
     # extract images
     for i,image in enumerate(images):
-      ofile = open("%s-%d-%d.eps" % (pdfname[:-4],ip,i+1),'w+')
+      image_name = "%s-%d-%d" % (pdfname[:-4],ip,i+1)
+      ofile = open("%s.eps" % image_name,'w+')
       for line in header1:
         ofile.write(line)
 
@@ -111,6 +111,9 @@ if __name__ == '__main__':
 
       ofile.close()
 
+      batcmd2 = "convert %s.eps %s.png" % (image_name, image_name)
+      result2 = subprocess.check_output(batcmd2, shell=True)
+
     # generate report page
     for g in graphs:
       g.plot()
@@ -129,3 +132,6 @@ if __name__ == '__main__':
         write_json(label,metadata,g,ofile)
     
       ofile.close()
+
+    result3 = subprocess.check_output("rm -f *.eps", shell=True)
+
