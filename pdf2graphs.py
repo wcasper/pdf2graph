@@ -112,8 +112,8 @@ def extract_images(page,lines,eps_objects,output='png'):
     ofile.close()
 
     if output != 'eps':
-        batcmd2 = "convert %s.eps %s.%s" % (image_name,image_name,output)
-        result2 = subprocess.check_output(batcmd2, shell=True)
+      batcmd2 = "convert %s.eps %s.%s" % (image_name,image_name,output)
+      result2 = subprocess.check_output(batcmd2, shell=True)
   
 
 if __name__ == '__main__':
@@ -137,19 +137,19 @@ if __name__ == '__main__':
     lines = ifile.readlines()
     ifile.close()
 
-    lines = remove_text(lines)
-    lines = remove_resources(lines)
-    lines = remove_page_setup(lines)
-    lines = remove_remainder(lines)
+    temp = remove_text(lines)
+    temp = remove_resources(temp)
+    temp = remove_page_setup(temp)
+    temp = remove_remainder(temp)
 
     content = ' '.join(lines)
     eps_objects = get_eps_objects(content)
 
     if args.graphs or not args.images:
-        extract_graphs(ip,eps_objects)
+      extract_graphs(ip,eps_objects)
 
     if not args.graphs or args.images:
-        extract_images(ip,lines,eps_objects,output=args.output)
+      extract_images(ip,lines,eps_objects,output=args.output)
 
   result3 = subprocess.check_output("rm -f *.eps", shell=True)
 
