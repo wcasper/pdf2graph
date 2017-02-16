@@ -9,6 +9,7 @@
 ##
 
 import numpy as np
+import re
 
 ##
 # This function removes entries between lines starting with a certain word and
@@ -65,16 +66,32 @@ def remove_text(lines):
 #%%EndResource comments.  This function removes resource entries.
 ##
 def remove_resources(lines):
-  return remove_data_between(lines,"%%BeginResource: ","%%EndResource\n")
+  return remove_data_between(lines,"%%%%BeginResource: ","%%%%EndResource\n")
 
 def remove_page_setup(lines):
-  return remove_data_between(lines,"%%BeginPageSetup\n","%%EndPageSetup\n")
+  return remove_data_between(lines,"%%%%BeginPageSetup\n","%%%%EndPageSetup\n")
 
 def remove_remainder(lines):
-  lines = remove_data_between(lines,"%!PS","%%Page:")
-  lines = remove_data_between(lines,"showpage\n","%%EOF")
+  lines = remove_data_between(lines,"%%%%!PS","%%%%Page:")
+  lines = remove_data_between(lines,"showpage\n","%%%%EOF")
   return lines
 
+def get_headers(lines):
+  mid = 0
+  end = 0
+  for i, line in enumerate(lines):
+    if line == "%%EndProlog\n":
+      end = i
+    elif mid == 0 and re.match(r"\%\%BoundingBox: \d+ \d+ \d+ \d+\n",line):
+      mid = i
 
+  return (lines[:mid], lines[mid+1:end+1])
 
+def get_footer(lines):
+  start = 0
+  for i, line in enumerate(lines):
+    if start == 0 and line == "showpage\n":
+      start = i
+      break
 
+  return lines[start:]

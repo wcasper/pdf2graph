@@ -30,13 +30,15 @@ class EPSImage(EPSObject):
   def __init__(self):
     EPSObject.__init__(self)
     self.setup = EPSDict()
-    self.setup.n = 10
+    self.setup.n = 12
     self.setup.keys = [ "ImageType","Width","Height","Interpolate",\
                         "BitsPerComponent","Decode","DataSource",\
-                        "ASCII85Decode","FlateDecode","ImageMatrix" ]
-    self.setup.values = [ 1, 0, 0, False, 1, [1,0], \
-                          "currentfile","currentfile",\
-                          "currentfile",[1,0,0,-1,0,0] ]
+                        "ASCII85Decode","DCT/Flate","FlateDCTDecode",\
+                        "ImageMatrix","setcolorspace" ]
+    self.setup.values = [ 1, 0, 0, None, 1, [1,0], "currentfile",\
+                          "/DCTDecode","currentfile","currentfile",\
+                          [1,0,0,-1,0,0],"/DeviceRGB" ]
     self.imagemask = ""
+    self.encoded = list()
 
 
