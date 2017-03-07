@@ -23,7 +23,7 @@ def get_eps_objects(content):
     b0 = blocks[ib-1]
     block = values[b0:b1]
 
-    if "setcolorspace" in block:
+    if "setcolorspace" in block or "image" in block or "imagemask" in block:
       image = EPSImage()
       blen = len(block)
 
@@ -66,14 +66,14 @@ def get_eps_objects(content):
               else:
                 tmp.append(block[j])
             image.setup.values[10] = tmp
-
-        elif(val == "imagemask"):
-          image.imagemask = block[i+1]
-        elif val == "image":
+        elif val == "image" or val == "imagemask":
+          image.setup.values[12] = val
           end = i + 1
-          while not ('~>Q' == block[end][-3:] or '~>' == block[end][-2:]):
-            end += 1
-          image.encoded = block[i+1:end+1]
+          if end < blen:
+            while not (block[end].endswith('~>Q') or block[end].endswith('~>')):
+              end += 1
+            end = min(end+1,blen)
+            image.encoded = block[i+1:end]
 
       objects.append(image)
 

@@ -34,11 +34,10 @@ class EPSImage(EPSObject):
     self.setup.keys = [ "ImageType","Width","Height","Interpolate",\
                         "BitsPerComponent","Decode","DataSource",\
                         "ASCII85Decode","DCT/Flate","FlateDCTDecode",\
-                        "ImageMatrix","setcolorspace" ]
+                        "ImageMatrix","setcolorspace","image/mask"]
     self.setup.values = [ 1, 0, 0, None, 1, [1,0], "currentfile",\
                           "/DCTDecode","currentfile","currentfile",\
-                          [1,0,0,-1,0,0],"/DeviceRGB" ]
-    self.imagemask = ""
-    self.encoded = list()
+                          [1,0,0,-1,0,0],None,"image"]
+    self.encoded = None
 
 
