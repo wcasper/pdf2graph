@@ -39,6 +39,22 @@ class Graph:
     g.e = self.e[:]
     return g
 
+  def get_degree(self,node):
+    d = 0
+    for edge in self.e:
+      if (edge[0] == node or edge[1] == node):
+        d += 1
+    return d
+
+  def get_degree_sequence(self):
+    degrees = [0]*self.n
+    for ni in range(self.n):
+      node = self.v[ni]
+      degrees[ni] = self.get_degree(node)
+
+    return degrees
+      
+
 ##
 # Return the connected subgraphs of a graph X
 ##
@@ -47,7 +63,7 @@ def get_connected_subgraphs(g0):
   subgraphs = []
 
   g = g0.copy()   # copy to avoid pulverizing input
-  while(g.n > 0 and len(g.v) > 0 and len(g.e) > 0):
+  while(g.n > 0 and len(g.v) > 0):
     # get the connected component of first vertex
     # and remove this from the total graph
     subg = Graph()
@@ -69,8 +85,10 @@ def get_connected_subgraphs(g0):
             g.del_node(edge[1])
           subg.add_edge(edge[0],edge[1])
           g.del_edge(edge[0],edge[1])
-      
-    subgraphs.append(subg)
+ 
+    # discard graphs with no edges
+    if len(subg.e) > 0:
+      subgraphs.append(subg)
   return subgraphs
 
 
