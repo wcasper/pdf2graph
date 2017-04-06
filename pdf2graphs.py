@@ -8,7 +8,7 @@ import argparse
 from epstrim import *
 from epsinterpreter import *
 from graph_guess import *
-from imagecv impoert *
+from imagecv import *
 
 ##
 # parse command line input
@@ -189,13 +189,13 @@ if __name__ == '__main__':
     
     # get number of fonts used in pdf
     # if zero fonts then pdf is scanned and requires image processing
-    batcmd0 = "pdffonts %s | wc -l" % pdfname
+    batcmd0 = "pdffonts %s | wc -l" % args.pdf
     nfonts = int(subprocess.check_output(batcmd0, shell=True)) - 2
 
-    if nfonts > 0:
-      batcmd00="pdftoppm -png %s page" % pdfname
+    if not nfonts:
+      batcmd00="pdftoppm -png %s page" % args.pdf
       subprocess.check_output(batcmd00, shell=True)
-      dirname = pdfname[0:-4]
+      dirname = args.pdf[0:-4]
       subprocess.check_output('mkdir -p ' + dirname, shell=True)
 
       for ip in range(first_page,last_page):
