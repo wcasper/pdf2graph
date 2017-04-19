@@ -17,15 +17,14 @@ class helper:
 
 			# create iterator for compressed article names
 			self.article_names = iter(self.block_reader.getnames())
-			self.article = next(self.article_names)
-
-			# check structure of tar file
-			if not re.match(r'\d\d\d\d', self.article):
-				raise IOError("file format does not match arXiv format")
+			self.article = False
 
 			self.block_writer = tarfile.open('labels_%s' % name, 'w:')
+			
 			self.temp_path = 'tmp'
 			self.output_path = output
+
+			self.skipped = list()
 		else:
 			raise IOError("file is not recognized as tar")
 
@@ -33,7 +32,7 @@ class helper:
 	# returns none if no more articles
 	def next_article(self):
 		# delete previous articles
-		if not re.match(r'^\d\d\d\d$', self.article):
+		if self.article:
 			if self.messages:
 				print("closing article %s" % self.article)
 			# remove files from previous article
@@ -47,6 +46,8 @@ class helper:
 		if self.article and not self.article.endswith('.gz'):
 			if self.messages:
 				print("%s is not a gzip file" % self.article)
+
+			self.skipped.append(self.article)
 			return self.next_article()
 
 		# open next article
@@ -63,7 +64,7 @@ class helper:
 				gz.close()
 
 			# write bytes to new file
-			tar_path = os.path.join(self.temp_path, self.article[:-3]) 
+			tar_path = os.path.join(self.temp_path, self.article[:-3])
 			with open(tar_path, 'wb') as tar:
 				tar.write(gz_bytes)
 				tar.close()
@@ -79,6 +80,8 @@ class helper:
 			else:
 				if self.messages:
 					print("%s does not decompress into a tar file" % self.article)
+				
+				self.skipped.append(self.article)
 				return self.next_article()
 				#raise IOError("%s does not decompress into a tar file" % self.article)
 		else:
@@ -86,31 +89,30 @@ class helper:
 
 	# writes input to new tar file with same format
 	def write(self, input_folder):
+		if not self.article:
+			raise Exception("no article has been extracted yet")
+
 		if not os.path.isdir(input_folder):
 			raise IOError("%s is not a folder" % input_folder)
 
+		if not os.path.isdir(self.temp_path):
+			os.mkdir(self.temp_path)
+
+		# make path if path does not exist
 		tar_path = os.path.join(self.temp_path, "%s.tar" % self.article[:-3])
-		write_tar = tarfile.open(tar_path, 'w:')
+		if not os.path.isdir(os.path.dirname(tar_path)):
+			os.mkdir(os.path.dirname(tar_path))
+
+		write_tar = tarfile.open(tar_path, 'w:gz')
 
 		# add files in folder to tar
 		for file_name in os.listdir(input_folder):
-			write_tar.add(os.path.join(input_folder, file_name))
+			write_tar.add(os.path.join(input_folder, file_name), arcname=file_name)
 
 		write_tar.close()
 
-		with open(tar_path, 'rb') as tar:
-			tar_bytes = tar.read()
-			tar.close()
-
-		gz_bytes = gzip.compress(tar_bytes)
-
-		gz_path = os.path.join(self.temp_path, 'out',self.article)
-		with gzip.open(gz_path, 'wb') as gz:
-			gz.write(gz_bytes)
-			gz.close()
-
 		# add gz file to overall tar file
-		self.block_writer.add(os.path.join(self.temp_path, 'out'))
+		self.block_writer.add(tar_path, arcname=self.article)
 
 		if self.messages:
 			print("written items in %s" % input_folder)
