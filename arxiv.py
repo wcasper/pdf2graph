@@ -55,35 +55,17 @@ class helper:
 			if self.messages:
 				print("decompressing article %s" % self.article)
 			# uncompress gz file into temp folder
-			self.block_reader.extract(self.article, path=self.temp_path)
-
-			# unzip and read gz file
-			gz_path = os.path.join(self.temp_path, self.article)
-			with gzip.open(gz_path, 'rb') as gz:
-				gz_bytes = gz.read()
-				gz.close()
-
-			# write bytes to new file
-			tar_path = os.path.join(self.temp_path, self.article[:-3])
-			with open(tar_path, 'wb') as tar:
-				tar.write(gz_bytes)
-				tar.close()
-
-			if self.messages:
-				print("untarring output of article %s" % self.article)
-
-			# read new tar file, extract contents to output folder
-			if tarfile.is_tarfile(tar_path):
-				article_tar = tarfile.open(tar_path, 'r:')
+			try:
+				self.block_reader.extract(self.article, path=self.temp_path)
+				article_tar = tarfile.open(os.path.join(self.temp_path, self.article), 'r:gz')
 				article_tar.extractall(path=self.output_path)
 				return self.output_path
-			else:
+			except tarfile.ReadError:
 				if self.messages:
-					print("%s does not decompress into a tar file" % self.article)
+					print("%s is not gzip or tar file" % self.article)
 				
 				self.skipped.append(self.article)
 				return self.next_article()
-				#raise IOError("%s does not decompress into a tar file" % self.article)
 		else:
 			return None
 
