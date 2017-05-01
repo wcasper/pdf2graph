@@ -41,8 +41,16 @@ class helper:
 			if os.path.isdir(self.output_path):
 				shutil.rmtree(self.output_path)
 
-		# make sure next article name is a gzip file
+		
 		self.article = next(self.article_names)
+		if self.article.endswith('.pdf'):
+			if self.messages:
+				print("decompressing pdf %s" % self.article)
+
+			self.block_reader.extract(self.article, path=self.temp_path)
+			return self.output_path
+
+		# make sure next article name is a gzip file
 		if self.article and not self.article.endswith('.gz'):
 			if self.messages:
 				print("%s is not a gzip file" % self.article)
@@ -70,7 +78,7 @@ class helper:
 			return None
 
 	# writes input to new tar file with same format
-	def write(self, input_folder):
+	def write(self, input_folder, name=self.article):
 		if not self.article:
 			raise Exception("no article has been extracted yet")
 
@@ -94,7 +102,7 @@ class helper:
 		write_tar.close()
 
 		# add gz file to overall tar file
-		self.block_writer.add(tar_path, arcname=self.article)
+		self.block_writer.add(tar_path, arcname=name)
 
 		if self.messages:
 			print("written items in %s" % input_folder)
