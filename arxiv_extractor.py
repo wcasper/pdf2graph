@@ -30,7 +30,6 @@ for tar_arxiv in os.listdir(directory):
 			else:
 				# other cases
 				pass
-
 		arxiv.write(write_folder)
 
 	arxiv_reader.close()
