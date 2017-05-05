@@ -8,9 +8,11 @@ import argparse
 from epstrim import *
 from epsinterpreter import *
 from graph_guess import *
-from tex2eps import *
+from imagecv import *
 
-
+##
+# parse command line input
+##
 parser = argparse.ArgumentParser()
 parser.add_argument('-f','--first',action='store',nargs=1,default=[1],help='first page')
 parser.add_argument('-l','--last',action='store',nargs=1,default=[1023],help='last page')
@@ -21,12 +23,10 @@ parser.add_argument('-o','--output',action='store',nargs=1,default='png',help='f
 parser.add_argument('--folder',action='store_true',default=False,help='specify folder of pdfs instead of pdf name')
 parser.add_argument('pdf')
 
-args = parser.parse_args()
 
 ##
 # convert pdf pages to graphs and output in json format
 ##
-
 def write_json(label,metadata,g,ofile):
   ofile.write("\"%s\": {\n" % label)
   ofile.write("  \"vertices\": [")
@@ -48,8 +48,10 @@ def write_json(label,metadata,g,ofile):
   ofile.write("  \"%s\": [\"%s\"]\n" % (pair[0],pair[1]))
   ofile.write("}\n\n")
 
-
-def extract_graphs(page,eps_objects,folder='.'):
+##
+# extract graphs from vector objects
+##
+def extract_graphs(page,eps_objects,write='.'):
   graph = graph_guess(eps_objects)
   graphs = get_connected_embedded_subgraphs(graph)
 
@@ -59,9 +61,9 @@ def extract_graphs(page,eps_objects,folder='.'):
     g.plot()
   
   if(len(graphs) > 0):
-    plt.savefig("%s/page_%i.png" % (folder,page))
+    plt.savefig("%s/page_%i.png" % (write,page))
     plt.clf()
-    ofile_name = "%s/page_%i.json" % (folder,page)
+    ofile_name = "%s/page_%i.json" % (write,page)
     ofile = open(ofile_name,"w")
 
     metadata = [["comments", "Graph found on page %i of %s" % (page,args.pdf)],\
@@ -75,8 +77,10 @@ def extract_graphs(page,eps_objects,folder='.'):
     
     ofile.close()
 
-
-def extract_images(page,lines,eps_objects,folder='.',output='png'):
+##
+# extract images from image objects
+##
+def extract_images(page,lines,eps_objects,write='.',image_type='png'):
   header1, header2 = get_headers(lines)
   footer = get_footer(lines)
 
@@ -91,7 +95,7 @@ def extract_images(page,lines,eps_objects,folder='.',output='png'):
   for i,image in enumerate(images):
     if image.encoded is not None: 
       image_name = "%d-%d" % (page,i+1)
-      ofile = open("%s/%s.eps" % (folder,image_name),'w+')
+      ofile = open("%s/%s.eps" % (write,image_name),'w+')
       for line in header1:
         ofile.write(line)
 
@@ -125,12 +129,90 @@ def extract_images(page,lines,eps_objects,folder='.',output='png'):
 
       ofile.close()
 
-      if output != 'eps':
-        batcmd2 = "convert %s/%s.eps %s/%s.%s" % (folder,image_name,folder,image_name,output)
+      if image_type != 'eps':
+        batcmd2 = "convert %s/%s.eps %s/%s.%s" % (read,image_name,write,image_name,image_type)
         result2 = subprocess.check_output(batcmd2, shell=True)
-  
+
+
+def extract(filename,first=0,last=sys.maxsize,graphs=True,images=True,author=None,write='.',image_type='png'):
+  if filename.endswith('.pdf'):
+    # get number of pages for pdf
+    batcmd="pdfinfo %s | grep -i Pages" % filename
+    result = subprocess.check_output(batcmd, shell=True)
+    npages = int(str(result).split()[1].replace("\\n'",""))
+    print("PDF has", npages, "pages")
+
+    first_page = max(1,min(first,npages))
+    last_page = min(npages,max(last,1)) + 1
+
+    # get number of fonts used in pdf
+    # if zero fonts then pdf is scanned and requires image processing
+    batcmd0 = "pdffonts %s | wc -l" % filename
+    nfonts = int(subprocess.check_output(batcmd0, shell=True)) - 2
+
+    if not nfonts:
+      batcmd00="pdftoppm -png %s page" % filename
+      subprocess.check_output(batcmd00, shell=True)
+      dirname = filename[0:-4]
+      subprocess.check_output('mkdir -p ' + dirname, shell=True)
+
+      for ip in range(first_page,last_page):
+        imput = "page-%s.png" % str(ip).zfill(len(str(npages)))
+        find_images(imput, dirname)
+    else:
+      # for each pdf page, remove text and convert to jpeg
+      for ip in range(first_page,last_page):
+        print("Converting page %i" % ip)
+        batcmd1 = "pdftocairo -f %i -l %i -eps %s page.eps" % (ip,ip,filename)
+        result1 = subprocess.check_output(batcmd1, shell=True)
+
+        ifile = open("page.eps")
+        lines = ifile.readlines()
+        ifile.close()
+
+        temp = remove_text(lines)
+        temp = remove_resources(temp)
+        temp = remove_page_setup(temp)
+        temp = remove_remainder(temp)
+
+        content = ' '.join(lines)
+        eps_objects = get_eps_objects(content)
+
+        if graphs or not images:
+          extract_graphs(ip,eps_objects)
+
+        if not graphs or images:
+          extract_images(ip,lines,eps_objects,write=write,image_type=image_type)
+
+  elif filename.endswith('.eps'):
+    # already an eps image
+    # convert to pdf and then back to eps with cairo
+    batcmd="epstopdf %s -o tmp.pdf" % (filename)
+    result = subprocess.check_output(batcmd, shell=True)
+    batcmd="pdftocairo tmp.pdf -ps tmp.ps -origpagesizes"
+    result = subprocess.check_output(batcmd, shell=True)
+
+    epsfile = open("tmp.ps","r")
+    lines = epsfile.readlines()
+    epsfile.close()
+
+    temp = remove_text(lines)
+    temp = remove_resources(temp)
+    temp = remove_page_setup(temp)
+    temp = remove_remainder(temp)
+
+    content = ' '.join(lines)
+    eps_objects = get_eps_objects(content)
+
+    if graphs or not images:
+      extract_graphs(0,eps_objects)
+
+    if not graphs or images:
+      extract_images(0,lines,eps_objects,output=output)
+
 
 if __name__ == '__main__':
+  args = parser.parse_args()
   if args.folder:
     for filename in os.listdir(args.pdf):
       if filename.endswith('.pdf'):
@@ -144,43 +226,70 @@ if __name__ == '__main__':
           os.makedirs(filename[:-4])
 
         # for each pdf page, remove text and convert to jpeg
-        images = []
         for ip in range(1,npages+1):
-          print("Converting page %i" % ip)
-          batcmd1 = "pdftocairo -f %i -l %i -eps %s/%s page.eps" % (ip,ip,args.pdf,filename)
-          result1 = subprocess.check_output(batcmd1, shell=True)
+          # get number of fonts used in pdf
+          # if zero fonts then pdf is scanned and requires image processing
+          batcmd0 = "pdffonts %s | wc -l" % filename
+          nfonts = int(subprocess.check_output(batcmd0, shell=True)) - 2
+          if nfonts > 0:
+            batcmd00="pdftoppm -png %s page" % filename
+            subprocess.check_output(batcmd00, shell=True)
+            dirname = filename[0:-4]
+            subprocess.check_output('mkdir -p ' + dirname, shell=True)
+            for ip in range(1, npages+1):
+              imput = "page-%s.png" % str(ip).zfill(len(str(npages)))
+              find_images(imput, dirname)
+          else:
+            # regular pdf, extract images and vector graphics
+            print("Converting page %i" % ip)
+            batcmd1 = "pdftocairo -f %i -l %i -eps %s/%s page.eps" % (ip,ip,args.pdf,filename)
+            result1 = subprocess.check_output(batcmd1, shell=True)
 
-          ifile = open("page.eps")
-          lines = ifile.readlines()
-          ifile.close()
+            ifile = open("page.eps")
+            lines = ifile.readlines()
+            ifile.close()
 
-          temp = remove_text(lines)
-          temp = remove_resources(temp)
-          temp = remove_page_setup(temp)
-          temp = remove_remainder(temp)
+            temp = remove_text(lines)
+            temp = remove_resources(temp)
+            temp = remove_page_setup(temp)
+            temp = remove_remainder(temp)
 
-          content = ' '.join(lines)
-          eps_objects = get_eps_objects(content)
+            content = ' '.join(lines)
+            eps_objects = get_eps_objects(content)
 
-          if args.graphs or not args.images:
-            extract_graphs(ip,eps_objects,folder=filename[:-4])
+            if args.graphs or not args.images:
+              extract_graphs(ip,eps_objects,folder=filename[:-4])
 
-          if not args.graphs or args.images:
-            extract_images(ip,lines,eps_objects,folder=filename[:-4],output=args.output)
+            if not args.graphs or args.images:
+              extract_images(ip,lines,eps_objects,folder=filename[:-4],output=args.output)
 
-  else: 
-    if args.pdf.endswith('.pdf'):
-      # get number of pages for pdf
-      batcmd="pdfinfo %s | grep -i Pages" % args.pdf
-      result = subprocess.check_output(batcmd, shell=True)
-      npages = int(str(result).split()[1].replace("\\n'",""))
-      print("PDF has", npages, "pages")
+  elif args.pdf.endswith('.pdf'):
+    # get number of pages for pdf
+    batcmd="pdfinfo %s | grep -i Pages" % args.pdf
+    result = subprocess.check_output(batcmd, shell=True)
+    npages = int(str(result).split()[1].replace("\\n'",""))
+    print("PDF has", npages, "pages")
 
-      first_page = max(1,min(int(args.first[0]),npages))
-      last_page = min(npages,max(int(args.last[0]),1)) + 1
+    first_page = max(1,min(int(args.first[0]),npages))
+    last_page = min(npages,max(int(args.last[0]),1)) + 1
 
+    # get number of fonts used in pdf
+    # if zero fonts then pdf is scanned and requires image processing
+    batcmd0 = "pdffonts %s | wc -l" % args.pdf
+    nfonts = int(subprocess.check_output(batcmd0, shell=True)) - 2
+
+    if not nfonts:
+      batcmd00="pdftoppm -png %s page" % args.pdf
+      subprocess.check_output(batcmd00, shell=True)
+      dirname = args.pdf[0:-4]
+      subprocess.check_output('mkdir -p ' + dirname, shell=True)
+
+      for ip in range(first_page,last_page):
+        imput = "page-%s.png" % str(ip).zfill(len(str(npages)))
+        find_images(imput, dirname)
+    else:
+      # TODO create output folder
       # for each pdf page, remove text and convert to jpeg
-      images = []
       for ip in range(first_page,last_page):
         print("Converting page %i" % ip)
         batcmd1 = "pdftocairo -f %i -l %i -eps %s page.eps" % (ip,ip,args.pdf)
@@ -204,34 +313,29 @@ if __name__ == '__main__':
         if not args.graphs or args.images:
           extract_images(ip,lines,eps_objects,output=args.output)
 
+  elif args.pdf.endswith('.eps'):
+    # already an eps image
+    # convert to pdf and then back to eps with cairo
+    batcmd="epstopdf %s -o tmp.pdf" % (args.pdf)
+    result = subprocess.check_output(batcmd, shell=True)
+    batcmd="pdftocairo tmp.pdf -ps tmp.ps -origpagesizes"
+    result = subprocess.check_output(batcmd, shell=True)
 
-    elif args.pdf.endswith('.eps'):
-      # already an eps image
-      # convert to pdf and then back to eps with cairo
-      batcmd="epstopdf %s -o tmp.pdf" % (args.pdf)
-      result = subprocess.check_output(batcmd, shell=True)
-      batcmd="pdftocairo tmp.pdf -ps tmp.ps -origpagesizes"
-      result = subprocess.check_output(batcmd, shell=True)
-
-      epsfile = open("tmp.ps","r")
-      lines = epsfile.readlines()
-      epsfile.close()
-
-
-      temp = remove_text(lines)
-      temp = remove_resources(temp)
-      temp = remove_page_setup(temp)
-      temp = remove_remainder(temp)
-
-      content = ' '.join(lines)
-      eps_objects = get_eps_objects(content)
-
-      if args.graphs or not args.images:
-        extract_graphs(0,eps_objects)
-
-      if not args.graphs or args.images:
-        extract_images(0,lines,eps_objects,output=args.output)
+    epsfile = open("tmp.ps","r")
+    lines = epsfile.readlines()
+    epsfile.close()
 
 
-#  result3 = subprocess.check_output("rm -f *.eps", shell=True)
+    temp = remove_text(lines)
+    temp = remove_resources(temp)
+    temp = remove_page_setup(temp)
+    temp = remove_remainder(temp)
 
+    content = ' '.join(lines)
+    eps_objects = get_eps_objects(content)
+
+    if args.graphs or not args.images:
+      extract_graphs(0,eps_objects)
+
+    if not args.graphs or args.images:
+      extract_images(0,lines,eps_objects,output=args.output)
