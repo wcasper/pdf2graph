@@ -28,7 +28,12 @@ while arxiv_reader.next_article():
 		elif ext == '.tex':
 			# parse tex file, retrieve source image filenames
 			images = pdf2graphs.parse_tex(document_path)
-			# retrieve source images from same directory
+			
+			# unable to read file
+			if not images:
+				arxiv_reader.skipped.append(document)
+				continue
+
 			for image in images:
 				if image[0] in documents:
 					os.rename(os.path.join(output_folder,image[0]), os.path.join(write_folder,image[0]))
@@ -40,7 +45,7 @@ while arxiv_reader.next_article():
 
 						tag_file.close()
 
-		elif ext != '.ps' and ext != '.eps':
+		elif ext not in ['.eps','.ps','.jpg','.png','.sty']:
 			print("unknown type %s" % document)
 
 	arxiv_reader.write()

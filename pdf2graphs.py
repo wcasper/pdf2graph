@@ -142,9 +142,13 @@ def extract_images(page,lines,eps_objects,write='.',image_type='png'):
 
 def parse_tex(filename):
 	# parse tex file
-	with open(filename,'r') as tex_file:
+	try:
+		tex_file = open(filename,'r')
 		lines = tex_file.readlines()
 		tex_file.close()
+	except UnicodeDecodeError:
+		print("unable to parse %s" % filename)
+		return None
 
 	images = list()
 
