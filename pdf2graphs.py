@@ -151,26 +151,54 @@ def parse_tex(filename):
 	# while next_line
 	i = 0
 	while i < len(lines):
-		if "\\begin{figure}" in lines[i]:
-			filename = str()
-			tags = list()
+		if lines[i].startswith('%'):
+			# line is a comment
+			pass
 
+		elif "\\begin{figure}" in lines[i]:
+			tags = set()
+			filename = str()
 			i += 1
 			while i < len(lines) and "\\end{figure}" not in lines[i]:
 				if "\\caption" in lines[i]:
 					# get keywords from caption
 					caption = re.search("\\caption{(.*)}", lines[i])
 					if caption:
-						tokens = re.sub("[^\w']", " ", caption.group(1)).split()
+						tokens = re.sub("[^\w']", ' ', caption.group(1)).split()
 						for token in tokens:
-							if len(token) > 3 and token not in tags:
-								tags.append(token)
+							if len(token) > 3:
+								tags.add(token.lower())
+					else:
+						content = lines[i].split("\\caption{")
+						if len(content) > 1:
+							tokens = re.sub("[^\w']", ' ', content[1]).split()
+							for token in tokens:
+								if len(token) > 3:
+									tags.add(token.lower())
 
+						# multiline caption
+						while i < len(lines) and '}' not in lines[i]:
+							tokens = re.sub("[^\w']", ' ', lines[i]).split()
+							for token in tokens:
+								if len(token) > 3:
+									tags.add(token.lower())
+
+							i += 1
+
+						if i < len(lines):
+							content = lines[i].split('}')[0]
+							tokens = re.sub("[^\w']", ' ', content).split()
+							for token in tokens:
+								if len(token) > 3:
+									tags.add(token.lower())
+							
+							i += 1
+			
 				elif "\\includegraphics" in lines[i]:
 					# get filename
 					search = re.search("\\includegraphics(\[.*\])?{([\w\.\-]+)}", lines[i])
 					if search:
-						filename = search.group(2)
+						filename = search.group(2)		
 					
 				elif "\\psfig" in lines[i]:
 					# get filename
@@ -183,10 +211,37 @@ def parse_tex(filename):
 					if search:
 						filename = search.group(1)
 
+				elif "\\plotone" in lines[i]:
+					search = re.search("\\plotone{([\w\.\-]+)}", lines[i])
+					if search:
+						filename = search.group(1)
+				
 				i += 1
+				
+			if i < len(lines):
+				images.append((filename, tags))
 
-			assert(i < len(lines))
-			images.append((filename,tags))
+		elif "\\includegraphics" in lines[i]:
+			# get filename
+			search = re.search("\\includegraphics(\[.*\])?{([\w\.\-]+)}", lines[i])
+			if search:
+				images.append((search.group(2), list()))
+			
+		elif "\\psfig" in lines[i]:
+			# get filename
+			search = re.search("\\psfig{(file=)?([\w\.\-]+)(,[^=]+=[^=]+)*}", lines[i])
+			if search:
+				images.append((search.group(2), list()))
+
+		elif "\\epsffile" in lines[i]:
+			search = re.search("\\epsffile{([\w\.\-]+)}", lines[i])
+			if search:
+				images.append((search.group(1), list()))
+
+		elif "\\plotone" in lines[i]:
+			search = re.search("\\plotone{([\w\.\-]+)}", lines[i])
+			if search:
+				images.append((search.group(1), list()))
 
 		i += 1
 	
