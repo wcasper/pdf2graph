@@ -319,6 +319,83 @@ def extract(filename,write='.',image_type='png'):
 		extract_images(ip,lines,eps_objects,write=write,image_type=image_type)
 
 
+def extract(filename,first=0,last=sys.maxsize,graphs=True,images=True,author=None,write='.',image_type='png'):
+  if filename.endswith('.pdf'):
+    # get number of pages for pdf
+    batcmd="pdfinfo %s | grep -i Pages" % filename
+    result = subprocess.check_output(batcmd, shell=True)
+    npages = int(str(result).split()[1].replace("\\n'",""))
+    print("PDF has", npages, "pages")
+
+    first_page = max(1,min(first,npages))
+    last_page = min(npages,max(last,1)) + 1
+
+    # get number of fonts used in pdf
+    # if zero fonts then pdf is scanned and requires image processing
+    batcmd0 = "pdffonts %s | wc -l" % filename
+    nfonts = int(subprocess.check_output(batcmd0, shell=True)) - 2
+
+    if not nfonts:
+      batcmd00="pdftoppm -png %s page" % filename
+      subprocess.check_output(batcmd00, shell=True)
+      dirname = filename[0:-4]
+      subprocess.check_output('mkdir -p ' + dirname, shell=True)
+
+      for ip in range(first_page,last_page):
+        imput = "page-%s.png" % str(ip).zfill(len(str(npages)))
+        find_images(imput, dirname)
+    else:
+      # for each pdf page, remove text and convert to jpeg
+      for ip in range(first_page,last_page):
+        print("Converting page %i" % ip)
+        batcmd1 = "pdftocairo -f %i -l %i -eps %s page.eps" % (ip,ip,filename)
+        result1 = subprocess.check_output(batcmd1, shell=True)
+
+        ifile = open("page.eps")
+        lines = ifile.readlines()
+        ifile.close()
+
+        temp = remove_text(lines)
+        temp = remove_resources(temp)
+        temp = remove_page_setup(temp)
+        temp = remove_remainder(temp)
+
+        content = ' '.join(lines)
+        eps_objects = get_eps_objects(content)
+
+        if graphs or not images:
+          extract_graphs(ip,eps_objects)
+
+        if not graphs or images:
+          extract_images(ip,lines,eps_objects,write=write,image_type=image_type)
+
+  elif filename.endswith('.eps'):
+    # already an eps image
+    # convert to pdf and then back to eps with cairo
+    batcmd="epstopdf %s -o tmp.pdf" % (filename)
+    result = subprocess.check_output(batcmd, shell=True)
+    batcmd="pdftocairo tmp.pdf -ps tmp.ps -origpagesizes"
+    result = subprocess.check_output(batcmd, shell=True)
+
+    epsfile = open("tmp.ps","r")
+    lines = epsfile.readlines()
+    epsfile.close()
+
+    temp = remove_text(lines)
+    temp = remove_resources(temp)
+    temp = remove_page_setup(temp)
+    temp = remove_remainder(temp)
+
+    content = ' '.join(lines)
+    eps_objects = get_eps_objects(content)
+
+    if graphs or not images:
+      extract_graphs(0,eps_objects)
+
+    if not graphs or images:
+      extract_images(0,lines,eps_objects,output=output)
+
+
 if __name__ == '__main__':
 	args = parser.parse_args()
 	if args.folder:

@@ -25,6 +25,17 @@ class EPSVectorPath(EPSObject):
     self.filled = False
     self.completed = False
 
+  def copy(self):
+    copypath = EPSVectorPath()
+    copypath.n = self.n
+    copypath.x = self.x.copy()
+    copypath.y = self.y.copy()
+    copypath.t = self.t.copy()
+    copypath.color = self.color
+    copypath.filled = self.filled
+    copypath.completed = self.completed
+    return copypath
+
 
 class EPSImage(EPSObject):
   def __init__(self):
