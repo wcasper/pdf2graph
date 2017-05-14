@@ -1,27 +1,31 @@
-import os
-import subprocess
 import arxiv
 import pdf2graphs
+import argparse
 
+from shutil import copyfile
+from os import mkdir, listdir, path
 
-directory = 'arxiv'
+parser = argparse.ArgumentParser(description="extracts and runs pdf2graphs on arXiv tar")
+parser.add_argument('arxiv', type=str, help='name of arxiv to process')
+parser.add_argument('output', type=str, help='name of output tar')
+args = parser.parse_args()
+
 output_folder = 'art'
 write_folder = 'wrt'
-tar_arxiv = 'arXiv_src_0001_001.tar'
 
 # for tar_arxiv in os.listdir(directory):
-arxiv_reader = arxiv.helper(tar_arxiv, write_name='images_0001_001', write=write_folder, output=output_folder, messages=True)
+arxiv_reader = arxiv.helper(args.arxiv, write_name=args.output, write=write_folder, output=output_folder, messages=True)
 
 # extract next article
 while arxiv_reader.next_article():
-	documents = os.listdir(output_folder)
-	if not os.path.isdir(write_folder):
-		os.mkdir(write_folder)
+	documents = listdir(output_folder)
+	if not path.isdir(write_folder):
+		mkdir(write_folder)
 
 	# check file types
 	for document in documents:
-		name, ext = os.path.splitext(document)
-		document_path = os.path.join(output_folder,document)
+		name, ext = path.splitext(document)
+		document_path = path.join(output_folder,document)
 		if ext == '.pdf':
 			pdf2graphs.extract(document_path, write=write_folder)
 
@@ -36,10 +40,10 @@ while arxiv_reader.next_article():
 
 			for image in images:
 				if image[0] in documents:
-					os.rename(os.path.join(output_folder,image[0]), os.path.join(write_folder,image[0]))
-					image_name, _ = os.path.splitext(image[0])
+					copyfile(path.join(output_folder,image[0]), path.join(write_folder,image[0]))
+					image_name, _ = path.splitext(image[0])
 					if len(image[1]) > 0:
-						tag_file = open(os.path.join(write_folder, "%s.tag" % image_name),'w+')
+						tag_file = open(path.join(write_folder, "%s.tag" % image_name),'w+')
 						for tag in image[1]:
 							tag_file.write("%s\n" % tag)
 

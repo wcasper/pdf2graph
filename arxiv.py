@@ -21,7 +21,7 @@ class helper:
 			self.article_names = iter(self.block_reader.getnames())
 			self.article = False
 			
-			self.block_writer = tarfile.open("%s.tar" % write_name, 'w:')
+			self.block_writer = tarfile.open(write_name, 'w:')
 			
 			self.temp_path = 'tmp'
 			self.output_path = output
