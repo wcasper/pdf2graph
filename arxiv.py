@@ -6,8 +6,10 @@ import gzip
 
 
 class helper:
+	skipped = list()
+	
 	# opens tarfile for reading
-	def __init__(self, name, output='out', messages=False):
+	def __init__(self, name, write_name="output", write='wrt', output='out', messages=False):
 		if tarfile.is_tarfile(name):
 			# create tar reader, articles are still compressed
 			self.block_reader = tarfile.open(name, 'r:')
@@ -18,13 +20,12 @@ class helper:
 			# create iterator for compressed article names
 			self.article_names = iter(self.block_reader.getnames())
 			self.article = False
-
-			self.block_writer = tarfile.open('labels_%s' % name, 'w:')
+			
+			self.block_writer = tarfile.open(write_name, 'w:')
 			
 			self.temp_path = 'tmp'
 			self.output_path = output
-
-			self.skipped = list()
+			self.write_path = write
 		else:
 			raise IOError("file is not recognized as tar")
 
@@ -40,6 +41,8 @@ class helper:
 				shutil.rmtree(self.temp_path)
 			if os.path.isdir(self.output_path):
 				shutil.rmtree(self.output_path)
+			if os.path.isdir(self.write_path):
+				shutil.rmtree(self.write_path)
 
 		
 		self.article = next(self.article_names)
@@ -47,7 +50,7 @@ class helper:
 			if self.messages:
 				print("decompressing pdf %s" % self.article)
 
-			self.block_reader.extract(self.article, path=self.temp_path)
+			self.block_reader.extract(self.article, path=self.output_path)
 			return self.output_path
 
 		# make sure next article name is a gzip file
@@ -78,45 +81,57 @@ class helper:
 			return None
 
 	# writes input to new tar file with same format
-	def write(self, input_folder, name=self.article):
+	def write(self, input_folder=None, name=None):
 		if not self.article:
 			raise Exception("no article has been extracted yet")
-
-		if not os.path.isdir(input_folder):
-			raise IOError("%s is not a folder" % input_folder)
 
 		if not os.path.isdir(self.temp_path):
 			os.mkdir(self.temp_path)
 
-		# make path if path does not exist
-		tar_path = os.path.join(self.temp_path, "%s.tar" % self.article[:-3])
-		if not os.path.isdir(os.path.dirname(tar_path)):
-			os.mkdir(os.path.dirname(tar_path))
+		if not input_folder:
+			input_folder = self.write_path
 
-		write_tar = tarfile.open(tar_path, 'w:gz')
+		if (not os.path.isdir(input_folder) or not os.listdir(input_folder)):
+			if self.messages:
+				print("%s empty or non-existent" % input_folder)
+		else:
+			# make path if path does not exist
+			tar_path = os.path.join(self.temp_path, "%s.tar" % self.article[:-3])
+			if not os.path.isdir(os.path.dirname(tar_path)):
+				os.mkdir(os.path.dirname(tar_path))
 
-		# add files in folder to tar
-		for file_name in os.listdir(input_folder):
-			write_tar.add(os.path.join(input_folder, file_name), arcname=file_name)
+			write_tar = tarfile.open(tar_path, 'w:gz')
 
-		write_tar.close()
+			# add files in folder to tar
+			for file_name in os.listdir(input_folder):
+				write_tar.add(os.path.join(input_folder, file_name), arcname=file_name)
 
-		# add gz file to overall tar file
-		self.block_writer.add(tar_path, arcname=name)
+			write_tar.close()
 
-		if self.messages:
-			print("written items in %s" % input_folder)
+			# add gz file to overall tar file
+			if name:
+				self.block_writer.add(tar_path, arcname=name)
+			else:
+				self.block_writer.add(tar_path, arcname=self.article)
+
+			if self.messages:
+				print("written %d items in %s" % (len(os.listdir(input_folder)), input_folder))
 
 	# delete temp folder once done
 	# close tarfile
 	def close(self):
 		if self.messages:
 			print("closing arXiv helper")
+			for name in skipped:
+				print(name)
 
 		if os.path.isdir(self.temp_path):
 			shutil.rmtree(self.temp_path)
 		if os.path.isdir(self.output_path):
 			shutil.rmtree(self.output_path)
+		if os.path.isdir(self.write_path):
+			shutil.rmtree(self.write_path)
 
 		self.block_reader.close()
 		self.block_writer.close()
+
